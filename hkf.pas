@@ -22,7 +22,7 @@ uses
 	
 
 const
-	CONF_NAME = 		'housekeeping-files.conf';
+	CONF_NAME = 		'hkf.conf';
 	
 	
 var
@@ -31,6 +31,9 @@ var
 	x: integer;
 	folderStart: string;
 	folderKeep: integer;
+	gTotalDeletedSize: real;
+	gTotalDeletedFiles: integer;
+	gFlagForReal: boolean;
 
 
 function ReadSettingKey(section: string; key: string): string;
@@ -106,7 +109,7 @@ begin
 end; // of function FileTimeToDTime
 
 	
-procedure ProcessFile(p: string; sr: TSearchRec; keepDays: integer);
+procedure ProcessFile(p: string; sr: TSearchRec; keepDays: integer; forReal: boolean);
 //
 //	Process a single file
 //
@@ -115,31 +118,39 @@ procedure ProcessFile(p: string; sr: TSearchRec; keepDays: integer);
 //	keepDays	Keep files younger the x days
 //
 var
-	dtCreate: TDateTime;
-	dtAccess: TDateTime;
+	//dtCreate: TDateTime;
+	//dtAccess: TDateTime;
 	dtModified: TDateTime;
 begin
-	WriteLn('ProcessFile(): ', p);
+	//WriteLn('ProcessFile(): ', p);
 	
 	//dtCreate := FileTimeToDTime(SR.FindData.ftCreationTime);	  	// Created
-	dtAccess := FileTimeToDTime(SR.FindData.ftLastAccessTime);		// Last Accessed
-	//dtModified := FileTimeToDTime(SR.FindData.ftLastWriteTime);		// Last Modified
+	//dtAccess := FileTimeToDTime(SR.FindData.ftLastAccessTime);		// Last Accessed
+	dtModified := FileTimeToDTime(SR.FindData.ftLastWriteTime);	// Last Modified
 	
-	WriteLn('            Size:    ', sr.Size);
+	//WriteLn('            Size:    ', sr.Size);
 	//WriteLn('         Created: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtCreate), ' ', DaysBetween(Now(), dtCreate));
-	WriteLn('   Last accessed: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtAccess), ' ', DaysBetween(Now(), dtAccess));
+	//WriteLn('   Last accessed: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtAccess), ' ', DaysBetween(Now(), dtAccess));
 	//WriteLn('   Last modified: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtModified), ' ', DaysBetween(Now(), dtModified));
 	
-	if DaysBetween(Now(), dtAccess) > keepDays then
+	if DaysBetween(Now(), dtModified) > keepDays then
 	begin
-		WriteLn('*** DELETE FILE ***');
+		
+		//WriteLn('Delete: ', p, ' ', forReal);
+		//WriteLn('*** DELETE FILE ***');
+		Inc(gTotalDeletedFiles);  // Add 1 to total deleted files counter.
+		gTotalDeletedSize := gTotalDeletedSize + sr.Size;
+		if forReal = true then
+			WriteLn('Delete file: ', p)
+		else
+			WriteLn('PREVIEW Delete file: ', p);
 	end; // of if
 	
-	WriteLn;
+	//WriteLn;
 end; // of procedure ProcessFile
 
 	
-procedure FindFilesRecur(strFolderStart: string; keepDays: integer);
+procedure FindFilesRecur(strFolderStart: string; keepDays: integer; forReal: boolean);
 //
 //	Find all files in folder strFolderStart and keep files younger then keepDays old.
 //
@@ -153,7 +164,7 @@ var
 begin
 	//strPath := ExtractFilePath(strFolderStart); {keep track of the path ie: c:\folder\}
 	strFileSpec := strFolderStart + '\*.*'; {keep track of the name or filter}
-	WriteLn('FindFilesRecur(): ', strFolderStart);
+	WriteLn(strFolderStart);
 	
 	intValid := FindFirst(strFileSpec, faAnyFile, sr); { Find first file}
 	//Writeln(intValid);
@@ -166,13 +177,13 @@ begin
 			begin
 				//WriteLn('Dir:    ', sr.Name);
 				strFolderChild := strFolderStart + '\' + sr.Name;
-				FindFilesRecur(strFolderChild, keepDays);
+				FindFilesRecur(strFolderChild, keepDays, forReal);
 			end
 			else
 			begin
 				strPathFoundFile := strFolderStart + '\' + sr.Name;
 				//WriteLn('File:    ', strPathFoundFile);
-				ProcessFile(strPathFoundFile, sr, keepDays);
+				ProcessFile(strPathFoundFile, sr, keepDays, forReal);
 				//ProcessLprFile(strPathFoundFile);
 				//ExtractEventsFromFile(strPathFoundFile);
 			end;
@@ -183,16 +194,26 @@ end; // of procedure FindFilesRecur
 
 
 begin
+	gTotalDeletedSize := 0;
+	gTotalDeletedFiles := 0;
+	gFlagForReal := false;
+
 	sets := ReadSettingKey('Settings',  'Sets');
-	WriteLn(sets);
+	//WriteLn(sets);
 	aSets := SplitString(sets, ';');
 	for x := 0 to high(aSets) do
 	begin
 		WriteLn(aSets[x]);
 		folderStart := ReadSettingKey(aSets[x], 'FolderStart');
 		folderKeep := StrToInt(ReadSettingKey(aSets[x], 'KeepDays'));
+		gFlagForReal := StrToBool(ReadSettingKey(aSets[x], 'ForReal'));
 		WriteLn(folderStart, '  >  ', folderKeep);
-		FindFilesRecur(folderStart, folderKeep);
+		FindFilesRecur(folderStart, folderKeep, gFlagForReal);
 	end;
+	
+	WriteLn;
+	WriteLn('Total deleted:      ', gTotalDeletedFiles:12, ' files');
+	WriteLn('Total deleted size: ', gTotalDeletedSize:12:0, ' bytes');
+	
 	//FindFilesRecur('D:\Temp');
 end. // of program HousekeepingFiles
