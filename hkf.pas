@@ -120,30 +120,33 @@ procedure ProcessFile(p: string; sr: TSearchRec; keepDays: integer; forReal: boo
 var
 	//dtCreate: TDateTime;
 	//dtAccess: TDateTime;
-	dtModified: TDateTime;
+	//dtModified: TDateTime;
+	dtFromFile: TDateTime;
+	daysOld: integer;
+	typeDate: string;
 begin
-	//WriteLn('ProcessFile(): ', p);
+	//dtFromFile := FileTimeToDTime(SR.FindData.ftCreationTime);	  	// Created
+	dtFromFile := FileTimeToDTime(SR.FindData.ftLastAccessTime);		// Last Accessed
+	typeDate := 'LAST ACCESS';
+	// dtFromFile := FileTimeToDTime(SR.FindData.ftLastWriteTime);		// Last Modified
+	daysOld := DaysBetween(Now(), dtFromFile);
 	
-	//dtCreate := FileTimeToDTime(SR.FindData.ftCreationTime);	  	// Created
-	//dtAccess := FileTimeToDTime(SR.FindData.ftLastAccessTime);		// Last Accessed
-	dtModified := FileTimeToDTime(SR.FindData.ftLastWriteTime);	// Last Modified
-	
-	//WriteLn('            Size:    ', sr.Size);
-	//WriteLn('         Created: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtCreate), ' ', DaysBetween(Now(), dtCreate));
-	//WriteLn('   Last accessed: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtAccess), ' ', DaysBetween(Now(), dtAccess));
-	//WriteLn('   Last modified: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtModified), ' ', DaysBetween(Now(), dtModified));
-	
-	if DaysBetween(Now(), dtModified) > keepDays then
+	if daysOld > keepDays then
 	begin
+		WriteLn;
+		WriteLn('ProcessFile(): ', p);
+		WriteLn('  Size      : ', sr.Size, ' bytes');
+		WriteLn('  File date : ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtFromFile), ' (', daysOld, ' days old) using ', typeDate);
 		
-		//WriteLn('Delete: ', p, ' ', forReal);
-		//WriteLn('*** DELETE FILE ***');
+		//WriteLn('         Created: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtCreate), ' ', DaysBetween(Now(), dtCreate));
+		//WriteLn('   Last accessed: ', FormatDateTime('YYYY-MM-DD hh:nn:ss', dtAccess), ' ', DaysBetween(Now(), dtAccess));
+	
 		Inc(gTotalDeletedFiles);  // Add 1 to total deleted files counter.
 		gTotalDeletedSize := gTotalDeletedSize + sr.Size;
 		if forReal = true then
-			WriteLn('Delete file: ', p)
+			DeleteFile(p)
 		else
-			WriteLn('PREVIEW Delete file: ', p);
+			WriteLn('    >>>> PREVIEW Delete file: ', p);
 	end; // of if
 	
 	//WriteLn;
@@ -165,6 +168,13 @@ begin
 	//strPath := ExtractFilePath(strFolderStart); {keep track of the path ie: c:\folder\}
 	strFileSpec := strFolderStart + '\*.*'; {keep track of the name or filter}
 	WriteLn(strFolderStart);
+	
+	if DirectoryExists(strFolderStart) = false then
+	begin
+		WriteLn('WARNING: Folder ', strFolderStart, ' doesn''t exists!');
+		Exit; // Exit this procedure.
+	end; // of if
+	
 	
 	intValid := FindFirst(strFileSpec, faAnyFile, sr); { Find first file}
 	//Writeln(intValid);
